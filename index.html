@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Infinity Task Manager</title>
     <style>
+        /* Basic reset and styling */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -258,23 +259,6 @@
             <canvas id="taskBarGraph"></canvas>
         </div>
 
-        <!-- Leave Approval Section -->
-        <h3>Leave Requests for Approval</h3>
-        <table class="team-table">
-            <thead>
-                <tr>
-                    <th>Team</th>
-                    <th>Leave Type</th>
-                    <th>Date Applied</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="leaveApprovalTable">
-                <!-- Leave requests will be populated here -->
-            </tbody>
-        </table>
-
         <!-- Leave Calendar -->
         <h3>Leave Requests Calendar</h3>
         <div class="calendar" id="leaveCalendar">
@@ -309,8 +293,6 @@
                 <option value="Sick Leave">Sick Leave</option>
                 <option value="Non-Paid Leave">Non-Paid Leave</option>
             </select>
-            <input type="date" id="leaveDate" placeholder="Select Date">
-            <input type="time" id="leaveTime" placeholder="Select Time">
             <button id="applyLeave">Apply Leave</button>
             <p id="leaveMessage" style="color: green; text-align: center;"></p>
         </div>
@@ -357,7 +339,8 @@
             { username: 'team_d_leader', password: 'team123', role: 'team', team: 'Team D' }
         ];
 
-        // Leave requests array modified to include leave date and time
+        // Task history and leave requests
+        const taskHistory = [];
         const leaveRequests = [];
 
         // Current logged-in user
@@ -370,63 +353,6 @@
         function showPage(page) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             page.classList.add('active');
-        }
-
-        // Function to handle leave application
-        function handleLeaveApplication() {
-            const leaveType = document.getElementById('leaveType').value;
-            const leaveDate = document.getElementById('leaveDate').value;
-            const leaveTime = document.getElementById('leaveTime').value;
-            const leaveMessage = document.getElementById('leaveMessage');
-
-            if (leaveType && leaveDate && leaveTime && currentUser) {
-                // Add leave request with the specified date and time
-                leaveRequests.push({
-                    team: currentUser.team,
-                    leaveType,
-                    date: leaveDate,
-                    time: leaveTime,
-                    approved: 'Pending'
-                });
-                leaveMessage.textContent = `${leaveType} applied successfully for ${currentUser.team} on ${leaveDate} at ${leaveTime}!`;
-                populateLeaveCalendar();
-                populateLeaveApprovalTable(); // Refresh the leave approval table for admin
-                document.getElementById('leaveType').value = '';
-                document.getElementById('leaveDate').value = '';
-                document.getElementById('leaveTime').value = '';
-            } else {
-                leaveMessage.textContent = 'Please select a leave type, date, and time.';
-            }
-        }
-
-        // Function to populate leave approval table for admin
-        function populateLeaveApprovalTable() {
-            const leaveApprovalTable = document.getElementById('leaveApprovalTable');
-            leaveApprovalTable.innerHTML = ''; // Clear previous content
-
-            leaveRequests.forEach((request, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${request.team}</td>
-                    <td>${request.leaveType}</td>
-                    <td>${request.date} at ${request.time}</td>
-                    <td>${request.approved}</td>
-                    <td>
-                        ${request.approved === 'Pending' ? `
-                            <button onclick="approveLeave(${index}, true)">Approve</button>
-                            <button onclick="approveLeave(${index}, false)">Reject</button>
-                        ` : 'Processed'}
-                    </td>
-                `;
-                leaveApprovalTable.appendChild(row);
-            });
-        }
-
-        // Function to approve or reject leave requests
-        function approveLeave(index, isApproved) {
-            leaveRequests[index].approved = isApproved ? 'Approved' : 'Rejected';
-            populateLeaveApprovalTable(); // Refresh the leave approval table
-            populateLeaveCalendar(); // Refresh the calendar to show updated status
         }
 
         // Function to populate leave calendar for the month
@@ -466,13 +392,148 @@
                     if (requestDate.getDate() === day && requestDate.getMonth() === currentMonth && requestDate.getFullYear() === currentYear) {
                         const leaveDiv = document.createElement('div');
                         leaveDiv.className = 'leave';
-                        leaveDiv.textContent = `${request.team}: ${request.leaveType} (${request.approved})`;
+                        leaveDiv.textContent = `${request.team}: ${request.leaveType}`;
                         dayCell.appendChild(leaveDiv);
                     }
                 });
 
                 leaveCalendar.appendChild(dayCell);
             }
+        }
+
+        // Function to handle leave application
+        function handleLeaveApplication() {
+            const leaveType = document.getElementById('leaveType').value;
+            const leaveMessage = document.getElementById('leaveMessage');
+
+            if (leaveType && currentUser) {
+                const date = new Date().toLocaleDateString();
+                leaveRequests.push({ team: currentUser.team, leaveType, date });
+                leaveMessage.textContent = `${leaveType} applied successfully for ${currentUser.team}!`;
+                populateLeaveCalendar();
+                document.getElementById('leaveType').value = '';
+            } else {
+                leaveMessage.textContent = 'Please select a leave type.';
+            }
+        }
+
+        // Function to populate task history table
+        function populateTaskHistory() {
+            const taskHistoryTable = document.getElementById('taskHistoryTable');
+            taskHistoryTable.innerHTML = ''; // Clear previous content
+
+            taskHistory.forEach(task => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${task.team}</td>
+                    <td>${task.description}</td>
+                    <td>${task.dateAssigned}</td>
+                    <td>
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: ${task.progress}%;">${task.progress}%</div>
+                        </div>
+                    </td>
+                `;
+                taskHistoryTable.appendChild(row);
+            });
+
+            updateBarGraph();
+        }
+
+        // Function to handle task assignment
+        function handleTaskAssignment() {
+            const teamSelect = document.getElementById('teamSelect');
+            const taskDescription = document.getElementById('taskDescription');
+            const taskMessage = document.getElementById('taskMessage');
+
+            if (teamSelect.value && taskDescription.value) {
+                const dateAssigned = new Date().toLocaleString();
+                // Add task to history with 0% progress
+                taskHistory.push({ team: teamSelect.value, description: taskDescription.value, dateAssigned, progress: 0 });
+                taskMessage.textContent = `Task "${taskDescription.value}" assigned to ${teamSelect.value}!`;
+                taskDescription.value = '';
+                teamSelect.value = '';
+                populateTaskHistory();
+            } else {
+                taskMessage.textContent = 'Please select a team and provide a task description.';
+            }
+        }
+
+        // Function to update bar graph
+        function updateBarGraph() {
+            const completedTasks = taskHistory.filter(task => task.progress === 100);
+            const inProgressTasks = taskHistory.filter(task => task.progress < 100);
+            const teams = [...new Set(taskHistory.map(task => task.team))];
+
+            const completedCounts = teams.map(team => completedTasks.filter(task => task.team === team).length);
+            const inProgressCounts = teams.map(team => inProgressTasks.filter(task => task.team === team).length);
+
+            const ctx = document.getElementById('taskBarGraph').getContext('2d');
+
+            if (barChart) {
+                barChart.destroy();
+            }
+
+            barChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: teams,
+                    datasets: [
+                        {
+                            label: 'Completed Tasks',
+                            data: completedCounts,
+                            backgroundColor: '#28a745' // Changed color to green for completed tasks
+                        },
+                        {
+                            label: 'In Progress Tasks',
+                            data: inProgressCounts,
+                            backgroundColor: '#dc3545' // Changed color to red for in-progress tasks
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Function to update the progress of a task
+        function updateTaskProgress(taskIndex) {
+            // Set the task progress to 100%
+            taskHistory[taskIndex].progress = 100;
+            populateTeamTasks(); // Refresh the tasks in the team dashboard
+            populateTaskHistory(); // Refresh the task history in the admin dashboard
+            updateBarGraph(); // Update the bar graph
+        }
+
+        // Function to populate tasks for the logged-in team
+        function populateTeamTasks() {
+            const teamTasksTable = document.getElementById('teamTasksTable');
+            teamTasksTable.innerHTML = ''; // Clear previous content
+
+            const teamTasks = taskHistory.filter(task => task.team === currentUser.team);
+
+            teamTasks.forEach((task, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${task.description}</td>
+                    <td>${task.dateAssigned}</td>
+                    <td>
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: ${task.progress}%;">${task.progress}%</div>
+                        </div>
+                    </td>
+                    <td>
+                        ${task.progress < 100 ? `<button onclick="updateTaskProgress(${index})">Update Progress</button>` : 'Completed'}
+                    </td>
+                `;
+                teamTasksTable.appendChild(row);
+            });
         }
 
         // Function to check login credentials
@@ -491,7 +552,6 @@
                     showPage(document.getElementById('adminDashboard'));
                     populateTaskHistory();
                     populateLeaveCalendar();
-                    populateLeaveApprovalTable(); // Initialize leave approval table
                 } else if (currentUser.role === 'team') {
                     showPage(document.getElementById('teamDashboard'));
                     populateTeamTasks(); // Populate tasks for the logged-in team
@@ -523,10 +583,7 @@
             submitLogin.addEventListener('click', handleLogin);
             submitTask.addEventListener('click', handleTaskAssignment);
             applyLeave.addEventListener('click', handleLeaveApplication);
-
-            populateLeaveApprovalTable(); // Initial call to populate leave approval table
         });
-
     </script>
 </body>
 </html>
