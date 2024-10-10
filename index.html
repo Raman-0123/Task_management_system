@@ -192,6 +192,14 @@
             width: 100%;
             height: 400px;
         }
+
+        .leave-list {
+            margin-top: 20px;
+        }
+
+        .leave-list h3 {
+            color: #131921;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -200,7 +208,6 @@
         <div class="logo">
             <img src="Screenshot 2024-09-13 193131.png" alt="Infinity Logo">
         </div>
-        
         <span class="gon">Infinity Task Manager</span>
         <div class="auth-buttons">
             <button id="loginButton">Login</button>
@@ -259,10 +266,25 @@
             <canvas id="taskBarGraph"></canvas>
         </div>
 
-        <!-- Leave Calendar -->
         <h3>Leave Requests Calendar</h3>
         <div class="calendar" id="leaveCalendar">
             <!-- Calendar content will be dynamically generated -->
+        </div>
+        <div class="leave-list">
+            <h3>Leave Requests</h3>
+            <table class="team-table">
+                <thead>
+                    <tr>
+                        <th>Leave No.</th>
+                        <th>Team</th>
+                        <th>Leave Type</th>
+                        <th>Date and Time</th>
+                    </tr>
+                </thead>
+                <tbody id="leaveRequestTable">
+                    <!-- Leave requests will be displayed here -->
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -342,6 +364,7 @@
         // Task history and leave requests
         const taskHistory = [];
         const leaveRequests = [];
+        let leaveCounter = 1; // Counter for leave requests
 
         // Current logged-in user
         let currentUser = null;
@@ -388,11 +411,11 @@
 
                 // Add leave requests for the current day
                 leaveRequests.forEach(request => {
-                    const requestDate = new Date(request.date);
+                    const requestDate = new Date(request.dateTime);
                     if (requestDate.getDate() === day && requestDate.getMonth() === currentMonth && requestDate.getFullYear() === currentYear) {
                         const leaveDiv = document.createElement('div');
                         leaveDiv.className = 'leave';
-                        leaveDiv.textContent = `${request.team}: ${request.leaveType}`;
+                        leaveDiv.textContent = `${request.leaveNumber}: ${request.team} - ${request.leaveType}`;
                         dayCell.appendChild(leaveDiv);
                     }
                 });
@@ -407,14 +430,33 @@
             const leaveMessage = document.getElementById('leaveMessage');
 
             if (leaveType && currentUser) {
-                const date = new Date().toLocaleDateString();
-                leaveRequests.push({ team: currentUser.team, leaveType, date });
-                leaveMessage.textContent = `${leaveType} applied successfully for ${currentUser.team}!`;
+                const dateTime = new Date().toLocaleString();
+                const leaveNumber = leaveCounter++; // Increment leave number for each request
+                leaveRequests.push({ team: currentUser.team, leaveType, dateTime, leaveNumber });
+                leaveMessage.textContent = `${leaveType} applied successfully for ${currentUser.team} on ${dateTime}!`;
                 populateLeaveCalendar();
+                updateLeaveRequestTable(); // Update the leave request table
                 document.getElementById('leaveType').value = '';
             } else {
                 leaveMessage.textContent = 'Please select a leave type.';
             }
+        }
+
+        // Function to populate leave request table
+        function updateLeaveRequestTable() {
+            const leaveRequestTable = document.getElementById('leaveRequestTable');
+            leaveRequestTable.innerHTML = ''; // Clear previous content
+
+            leaveRequests.forEach(request => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${request.leaveNumber}</td>
+                    <td>${request.team}</td>
+                    <td>${request.leaveType}</td>
+                    <td>${request.dateTime}</td>
+                `;
+                leaveRequestTable.appendChild(row);
+            });
         }
 
         // Function to populate task history table
@@ -448,7 +490,6 @@
 
             if (teamSelect.value && taskDescription.value) {
                 const dateAssigned = new Date().toLocaleString();
-                // Add task to history with 0% progress
                 taskHistory.push({ team: teamSelect.value, description: taskDescription.value, dateAssigned, progress: 0 });
                 taskMessage.textContent = `Task "${taskDescription.value}" assigned to ${teamSelect.value}!`;
                 taskDescription.value = '';
@@ -482,12 +523,12 @@
                         {
                             label: 'Completed Tasks',
                             data: completedCounts,
-                            backgroundColor: '#28a745' // Changed color to green for completed tasks
+                            backgroundColor: '#28a745'
                         },
                         {
                             label: 'In Progress Tasks',
                             data: inProgressCounts,
-                            backgroundColor: '#dc3545' // Changed color to red for in-progress tasks
+                            backgroundColor: '#dc3545'
                         }
                     ]
                 },
@@ -504,17 +545,16 @@
 
         // Function to update the progress of a task
         function updateTaskProgress(taskIndex) {
-            // Set the task progress to 100%
             taskHistory[taskIndex].progress = 100;
-            populateTeamTasks(); // Refresh the tasks in the team dashboard
-            populateTaskHistory(); // Refresh the task history in the admin dashboard
-            updateBarGraph(); // Update the bar graph
+            populateTeamTasks();
+            populateTaskHistory();
+            updateBarGraph();
         }
 
         // Function to populate tasks for the logged-in team
         function populateTeamTasks() {
             const teamTasksTable = document.getElementById('teamTasksTable');
-            teamTasksTable.innerHTML = ''; // Clear previous content
+            teamTasksTable.innerHTML = '';
 
             const teamTasks = taskHistory.filter(task => task.team === currentUser.team);
 
@@ -552,9 +592,10 @@
                     showPage(document.getElementById('adminDashboard'));
                     populateTaskHistory();
                     populateLeaveCalendar();
+                    updateLeaveRequestTable();
                 } else if (currentUser.role === 'team') {
                     showPage(document.getElementById('teamDashboard'));
-                    populateTeamTasks(); // Populate tasks for the logged-in team
+                    populateTeamTasks();
                 }
                 document.getElementById('loginMessage').textContent = '';
                 document.getElementById('loginButton').style.display = 'none';
